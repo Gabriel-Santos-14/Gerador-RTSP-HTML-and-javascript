@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerador de URL RTSP beNuvem</title>
+    <style>
+        /* CSS Embutido para funcionar em qualquer máquina */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f7f6;
+            display: flex;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 500px;
+        }
+        h1 { color: #2c3e50; text-align: center; font-size: 24px; }
+        .desc { font-size: 0.85em; color: #7f8c8d; margin-bottom: 5px; margin-top: 2px; }
+        label { font-weight: bold; display: block; margin-top: 15px; color: #34495e; }
+        input, select { 
+            width: 100%; 
+            padding: 10px; 
+            margin-bottom: 5px; 
+            box-sizing: border-box; 
+            border: 1px solid #ddd; 
+            border-radius: 6px;
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            background-color: #27ae60;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: background 0.3s;
+        }
+        button:hover { background-color: #219150; }
+        #resultado { 
+            margin-top: 25px; 
+            padding: 15px; 
+            background: #e8f4fd; 
+            border-left: 5px solid #3498db; 
+            border-radius: 5px; 
+            display: none; 
+        }
+        #urlFinal { word-break: break-all; color: #004085; font-family: monospace; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Gerador RTSP beNuvem</h1>
+
+    <label>Selecione a Marca:</label>
+    <select id="selectMarca" onchange="carregarCampos()"> 
+        <option value="">-- Selecione --</option>
+    </select>
+
+    <div id="areaInputs"></div>
+
+    <button onclick="gerarLink()">Gerar URL</button>
+
+    <div id="resultado"> 
+        <p><strong>URL Gerada:</strong></p>
+        <p id="urlFinal"></p>
+    </div>
+</div>
+
+<script>
+    const MARCAS = {
+        "intelbras": {
+            "nome_exibicao": "Intelbras",
+            "template": "rtsp://{USUARIO}:{SENHA}@{DOMINIO}:{PORTA}/cam/realmonitor?channel={CANAL}&subtype={SUBTIPO}",
+            "ajuda": {
+                "DOMINIO": "IP ou DDNS (ex: 201.69.32.233)",
+                "PORTA": "Porta RTSP (ex: 554)",
+                "USUARIO": "Usuário (ex: admin)",
+                "SENHA": "Senha da câmera",
+                "CANAL": "Canal (ex: 1)",
+                "SUBTIPO": "0 (Principal) ou 1 (Extra)"
+            }
+        },
+        "hikvision": {
+            "nome_exibicao": "Hikvision",
+            "template": "rtsp://{USUARIO}:{SENHA}@{DOMINIO}:{PORTA}/Streaming/Channels/{CANAL}0{STREAM}",
+            "ajuda": {
+                "DOMINIO": "IP ou DDNS",
+                "PORTA": "Porta RTSP (padrão: 554)",
+                "USUARIO": "Usuário",
+                "SENHA": "Senha",
+                "CANAL": "Canal (ex: 1)",
+                "STREAM": "1 (Principal) ou 2 (Extra)"
+            }
+        },
+        "uniview": {
+            "nome_exibicao": "Uniview (UNV)",
+            "template": "rtsp://{USUARIO}:{SENHA}@{DOMINIO}:{PORTA}/media/video/stream/main?channel={CANAL}&subtype={SUBTIPO}",
+            "ajuda": {
+                "DOMINIO": "IP ou DDNS",
+                "PORTA": "Porta RTSP (padrão: 554)",
+                "USUARIO": "Usuário",
+                "SENHA": "Senha",
+                "CANAL": "Canal (ex: 1)",
+                "SUBTIPO": "0 (Principal) ou 1 (Extra)"
+            }
+        },
+        "GIGA": {
+             "nome_exibicao": "GIGA Security",
+             "template": "rtsp://{DOMINIO}:{PORTA}/user={USUARIO}&password={SENHA}&channel={CANAL}&stream={SUBTIPO}.sdp",
+             "ajuda":{
+                "DOMINIO": "IP ou DDNS",
+                "PORTA": "Porta RTSP (ex: 554)",
+                "USUARIO": "Usuário",
+                "SENHA": "Senha",
+                "CANAL": "Canal (ex: 1)",
+                "SUBTIPO": "0 (Principal) ou 1 (Extra)"
+            }
+        },
+        "JFL": {
+            "nome_exibicao": "JFL Alarmes",
+            "template": "rtsp://{USUARIO}:{SENHA}@{DOMINIO}:{PORTA}/h264/ch{CANAL}/main/av_stream",
+            "ajuda":{
+                "DOMINIO": "IP ou DDNS",
+                "PORTA": "Porta RTSP (ex: 554)",
+                "USUARIO": "Usuário",
+                "SENHA": "Senha",
+                "CANAL": "Canal (ex: 1)"
+            }
+        },
+        "Vivotek": {
+            "nome_exibicao": "Vivotek",
+            "template": "rtsp://{USUARIO}:{SENHA}@{DOMINIO}:{PORTA}/live.sdp",
+            "ajuda": {
+                "DOMINIO": "IP ou DDNS",
+                "PORTA": "Porta (padrão: 554)",
+                "USUARIO": "Usuario",
+                "SENHA": "Senha"
+            }
+        }
+    };
+
+    const select = document.getElementById('selectMarca');
+    const areaInputs = document.getElementById('areaInputs');
+    const divResultado = document.getElementById('resultado');
+
+    window.onload = function() {
+        for (let key in MARCAS) {
+            let option = document.createElement('option');
+            option.value = key;
+            option.text = MARCAS[key].nome_exibicao;
+            select.appendChild(option);
+        }
+    };
+
+    function carregarCampos() {
+        areaInputs.innerHTML = ''; 
+        divResultado.style.display = 'none'; 
+        
+        let marcaKey = select.value;
+        if (!marcaKey) return;
+
+        let dados = MARCAS[marcaKey];
+
+        for (let campo in dados.ajuda) {
+            let label = document.createElement('label');
+            label.innerText = campo;
+            
+            let desc = document.createElement('div');
+            desc.className = 'desc';
+            desc.innerText = dados.ajuda[campo];
+            
+            let input = document.createElement('input');
+            input.id = 'input_' + campo;
+            input.type = 'text';
+            input.placeholder = `Digite ${campo}...`;
+
+            if (["PORTA", "CANAL", "STREAM"].includes(campo)) {
+                input.oninput = function() {
+                    this.value = this.value.replace(/[^0-9]/g, '');
+                };
+            }
+
+            areaInputs.appendChild(label);
+            areaInputs.appendChild(desc);
+            areaInputs.appendChild(input);
+        }
+    }
+
+    function gerarLink() {
+        let marcaKey = select.value;
+        if (!marcaKey) {
+            alert("Selecione uma marca primeiro!");
+            return;
+        }
+
+        let template = MARCAS[marcaKey].template;
+        let campos = MARCAS[marcaKey].ajuda;
+
+        for (let campo in campos) {
+            let inputElement = document.getElementById('input_' + campo);
+            let valor = inputElement.value.trim();
+
+            if (!valor) {
+                alert(`Preencha o campo ${campo}`);
+                return;
+            }
+
+            if (campo === "DOMINIO" && (valor.startsWith("192.168") || valor.startsWith("10.0") || valor.startsWith("172."))) {
+                alert("Atenção! O IP digitado (" + valor + ") é um IP local.\n\nPara que o VMS beNuvem acesse a câmera, utilize um IP externo ou DDNS.");
+            }
+
+            template = template.replace('{' + campo + '}', valor);
+        }
+
+        document.getElementById('urlFinal').innerText = template;
+        divResultado.style.display = 'block';
+    }
+</script>
+
+</body>
+</html>
