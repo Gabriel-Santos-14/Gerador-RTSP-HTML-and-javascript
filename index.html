@@ -216,7 +216,7 @@
             }
 
             if (campo === "DOMINIO" && (valor.startsWith("192.168") || valor.startsWith("10.0") || valor.startsWith("172."))) {
-                alert("Atenção! O IP digitado (" + valor + ") é um IP local.\n\nPara que a beNuvem realize uma conexão com a câmera, utilize um IP externo ou DDNS.");
+                alert("Atenção! O IP digitado (" + valor + ") é um IP local.\n\nPara que a beNuvem acesse a câmera, utilize um IP externo ou DDNS.");
             }
 
             template = template.replace('{' + campo + '}', valor);
@@ -228,5 +228,4 @@
 </script>
 
 </body>
-
 </html>
